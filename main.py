@@ -3,6 +3,7 @@ import os
 import sys
 import threading
 import time
+import asyncio
 from datetime import datetime
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler
 from flask import Flask
@@ -98,6 +99,13 @@ _bot_application = None
 def run_bot():
     """Chạy bot Telegram trong thread riêng"""
     global _bot_running, _bot_application
+    
+    # Tạo event loop mới cho thread
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    except Exception as e:
+        logger.error(f"❌ LỖI TẠO EVENT LOOP: {e}")
     
     if _bot_running:
         logger.info("ℹ️ Bot đã đang chạy, bỏ qua...")
@@ -274,7 +282,13 @@ start_bot_thread()
 
 # Phần này chỉ chạy khi file được chạy trực tiếp (dùng để test local)
 if __name__ == '__main__':
-    port = int(os.getenv('PORT', 8080))
-    logger.info(f"🌐 CHẠY Ở CHẾ ĐỘ LOCAL - Flask sẽ chạy trên port {port}")
-    logger.info("⚠️ Bot đã được khởi động trong thread riêng")
-    app.run(host='0.0.0.0', port=port, debug=False)
+    # Kiểm tra xem có đang chạy trên Render không
+    if os.getenv('RENDER') == 'true':
+        logger.info("🏭 Đang chạy trên Render - Gunicorn sẽ quản lý Flask")
+        # Không làm gì thêm, gunicorn sẽ chạy app
+    else:
+        # Chạy local để test
+        port = int(os.getenv('PORT', 8080))
+        logger.info(f"🌐 CHẠY Ở CHẾ ĐỘ LOCAL - Flask sẽ chạy trên port {port}")
+        logger.info("⚠️ Bot đã được khởi động trong thread riêng")
+        app.run(host='0.0.0.0', port=port, debug=False)
