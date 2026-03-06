@@ -1,11 +1,9 @@
 ﻿import logging
 import os
 import sys
-import threading
+import multiprocessing
 import time
-import asyncio
 from datetime import datetime
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler
 from flask import Flask
 
 # Tạo thư mục database nếu chưa có
@@ -61,11 +59,11 @@ logger = logging.getLogger(__name__)
 # Import database
 from database.models import db, init_db
 
-# Import handlers
-from handlers.start import start_command
-from handlers.balance import balance_command
-from handlers.deposit import deposit_command, deposit_amount_callback, deposit_check_callback
-from handlers.callback import menu_callback
+# Import handlers - sẽ được import trong process con
+# from handlers.start import start_command
+# from handlers.balance import balance_command
+# from handlers.deposit import deposit_command, deposit_amount_callback, deposit_check_callback
+# from handlers.callback import menu_callback
 from handlers.sepay import setup_sepay_webhook
 
 # Tạo Flask app
@@ -91,32 +89,49 @@ with app.app_context():
 # Thiết lập webhook SePay
 setup_sepay_webhook(app)
 
-# Biến toàn cục để theo dõi trạng thái bot
-_bot_running = False
-_bot_thread = None
-_bot_application = None
+# Biến toàn cục để theo dõi tiến trình bot
+_bot_process = None
 
-def run_bot():
-    """Chạy bot Telegram trong thread riêng"""
-    global _bot_running, _bot_application
+def run_bot_process():
+    """Hàm này sẽ chạy trong một tiến trình riêng - KHÔNG dùng chung Flask app"""
+    import asyncio
+    import logging
+    import os
+    from telegram.ext import Application, CommandHandler, CallbackQueryHandler
     
-    # Tạo event loop mới cho thread
+    # Cấu hình logging cho process con
+    logging.basicConfig(
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        level=logging.INFO
+    )
+    logger = logging.getLogger("bot_process")
+    
+    # Import handlers trong process con
+    from handlers.start import start_command
+    from handlers.balance import balance_command
+    from handlers.deposit import deposit_command, deposit_amount_callback, deposit_check_callback
+    from handlers.callback import menu_callback
+    
+    # Tạo event loop mới cho process này
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
+        logger.info("✅ Đã tạo event loop cho bot process")
     except Exception as e:
         logger.error(f"❌ LỖI TẠO EVENT LOOP: {e}")
-    
-    if _bot_running:
-        logger.info("ℹ️ Bot đã đang chạy, bỏ qua...")
         return
     
     try:
-        logger.info("🚀 ĐANG KHỞI ĐỘNG BOT TELEGRAM...")
+        logger.info("🚀 BOT PROCESS ĐANG KHỞI ĐỘNG...")
+        
+        # Lấy token từ biến môi trường (đã được kế thừa từ process cha)
+        token = os.getenv('BOT_TOKEN')
+        if not token:
+            logger.error("❌ KHÔNG TÌM THẤY BOT_TOKEN trong process con")
+            return
         
         # Tạo application
-        application = Application.builder().token(BOT_TOKEN).build()
-        _bot_application = application
+        application = Application.builder().token(token).build()
         
         # Command handlers
         application.add_handler(CommandHandler("start", start_command))
@@ -128,39 +143,33 @@ def run_bot():
         application.add_handler(CallbackQueryHandler(deposit_check_callback, pattern="^deposit_check_"))
         application.add_handler(CallbackQueryHandler(menu_callback, pattern="^menu_"))
         
-        logger.info("✅ BOT TELEGRAM ĐÃ KHỞI ĐỘNG THÀNH CÔNG!")
-        _bot_running = True
+        logger.info("✅ BOT PROCESS ĐÃ KHỞI ĐỘNG THÀNH CÔNG!")
         
-        # Chạy bot (chặn thread này)
+        # Chạy bot (chặn process này)
         application.run_polling(timeout=30, drop_pending_updates=True)
         
     except Exception as e:
-        logger.error(f"❌ LỖI KHI CHẠY BOT: {e}")
-        _bot_running = False
-        _bot_application = None
-        
-        # Đợi 30 giây rồi thử lại
-        logger.info("⏳ Thử lại sau 30 giây...")
-        time.sleep(30)
-        run_bot()
+        logger.error(f"❌ LỖI TRONG BOT PROCESS: {e}")
+        import traceback
+        traceback.print_exc()
 
-def start_bot_thread():
-    """Khởi động bot trong một thread riêng biệt"""
-    global _bot_thread
-    if _bot_thread is None or not _bot_thread.is_alive():
-        _bot_thread = threading.Thread(target=run_bot, daemon=True)
-        _bot_thread.start()
-        logger.info("🤖 THREAD BOT ĐÃ ĐƯỢC KHỞI TẠO")
+def start_bot_process():
+    """Khởi động bot trong một tiến trình riêng"""
+    global _bot_process
+    if _bot_process is None or not _bot_process.is_alive():
+        _bot_process = multiprocessing.Process(target=run_bot_process, daemon=True)
+        _bot_process.start()
+        logger.info(f"🤖 TIẾN TRÌNH BOT ĐÃ ĐƯỢC KHỞI TẠO VỚI PID: {_bot_process.pid}")
         return True
     else:
-        logger.info("ℹ️ Thread bot đã đang chạy")
+        logger.info(f"ℹ️ Tiến trình bot đã đang chạy với PID: {_bot_process.pid}")
         return False
 
 @app.route('/')
 def home():
     """Trang chủ kiểm tra bot đang chạy"""
-    status = "✅ BOT ĐANG CHẠY" if _bot_running else "⏳ BOT ĐANG KHỞI ĐỘNG"
-    thread_status = "✅ ĐANG CHẠY" if _bot_thread and _bot_thread.is_alive() else "⏳ CHƯA CHẠY"
+    bot_status = "✅ BOT ĐANG CHẠY" if _bot_process and _bot_process.is_alive() else "❌ BOT KHÔNG CHẠY"
+    pid_info = f"PID: {_bot_process.pid}" if _bot_process and _bot_process.is_alive() else "Chưa khởi động"
     
     return f"""
     <!DOCTYPE html>
@@ -197,11 +206,6 @@ def home():
                 color: #155724;
                 border: 1px solid #c3e6cb;
             }}
-            .info {{
-                background-color: #d1ecf1;
-                color: #0c5460;
-                border: 1px solid #bee5eb;
-            }}
             .warning {{
                 background-color: #fff3cd;
                 color: #856404;
@@ -226,15 +230,12 @@ def home():
             <h1>🤖 Bot Thuê SMS 24/7</h1>
             
             <div class="status success">
-                <strong>🚀 TRẠNG THÁI SERVICE:</strong> ✅ ĐANG CHẠY
+                <strong>🚀 FLASK SERVER:</strong> ✅ ĐANG CHẠY
             </div>
             
-            <div class="status { 'success' if _bot_running else 'warning' }">
-                <strong>🤖 BOT TELEGRAM:</strong> {status}
-            </div>
-            
-            <div class="status { 'success' if _bot_thread and _bot_thread.is_alive() else 'info' }">
-                <strong>🧵 THREAD BOT:</strong> {thread_status}
+            <div class="status { 'success' if _bot_process and _bot_process.is_alive() else 'warning' }">
+                <strong>🤖 BOT TELEGRAM:</strong> {bot_status}<br>
+                <strong>🆔 PID:</strong> {pid_info}
             </div>
             
             <div class="bank-info">
@@ -265,8 +266,8 @@ def health():
     """Health check cho Render"""
     return {
         "status": "healthy",
-        "bot": "running" if _bot_running else "starting",
-        "thread": "alive" if _bot_thread and _bot_thread.is_alive() else "dead",
+        "bot": "running" if _bot_process and _bot_process.is_alive() else "stopped",
+        "pid": _bot_process.pid if _bot_process and _bot_process.is_alive() else None,
         "timestamp": datetime.now().isoformat()
     }, 200
 
@@ -276,11 +277,11 @@ def sepay_webhook_handler():
     from handlers.sepay import sepay_webhook
     return sepay_webhook()
 
-# Khởi động bot thread ngay khi Flask app được khởi tạo
-logger.info("🔄 ĐANG KHỞI ĐỘNG BOT THREAD...")
-start_bot_thread()
+# Khởi động bot process ngay khi Flask app được khởi tạo
+logger.info("🔄 ĐANG KHỞI ĐỘNG TIẾN TRÌNH BOT...")
+start_bot_process()
 
-# Phần này chỉ chạy khi file được chạy trực tiếp (dùng để test local)
+# Phần này chỉ chạy khi file được chạy trực tiếp
 if __name__ == '__main__':
     # Kiểm tra xem có đang chạy trên Render không
     if os.getenv('RENDER') == 'true':
@@ -290,5 +291,4 @@ if __name__ == '__main__':
         # Chạy local để test
         port = int(os.getenv('PORT', 8080))
         logger.info(f"🌐 CHẠY Ở CHẾ ĐỘ LOCAL - Flask sẽ chạy trên port {port}")
-        logger.info("⚠️ Bot đã được khởi động trong thread riêng")
         app.run(host='0.0.0.0', port=port, debug=False)
