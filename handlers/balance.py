@@ -1,8 +1,8 @@
 ﻿from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes
+from telegram.ext import CallbackContext as Context
 from database.models import User
 
-async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def balance_command(update: Update, context: Context):
     user = update.effective_user
     
     from main import app

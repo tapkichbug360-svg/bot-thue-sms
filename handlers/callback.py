@@ -1,9 +1,9 @@
 ﻿from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes
+from telegram.ext import CallbackContext as Context
 from database.models import User, Rental
 from datetime import datetime
 
-async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def menu_callback(update: Update, context: Context):
     query = update.callback_query
     await query.answer()
     

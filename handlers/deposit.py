@@ -1,5 +1,5 @@
 ﻿from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes
+from telegram.ext import CallbackContext as Context
 from database.models import User, Transaction, db
 from datetime import datetime
 import logging
@@ -13,7 +13,7 @@ MB_ACCOUNT = os.getenv('MB_ACCOUNT', '666666291005')
 MB_NAME = os.getenv('MB_NAME', 'NGUYEN THE LAM')
 MB_BIN = os.getenv('MB_BIN', '970422')
 
-async def deposit_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def deposit_command(update: Update, context: Context):
     transaction_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
     
     context.user_data['pending_deposit'] = {
@@ -49,7 +49,7 @@ async def deposit_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text(text, reply_markup=reply_markup, parse_mode='Markdown')
 
-async def deposit_amount_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def deposit_amount_callback(update: Update, context: Context):
     query = update.callback_query
     await query.answer()
     
@@ -104,7 +104,7 @@ async def deposit_amount_callback(update: Update, context: ContextTypes.DEFAULT_
     
     await query.delete_message()
 
-async def deposit_check_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def deposit_check_callback(update: Update, context: Context):
     query = update.callback_query
     await query.answer()
     

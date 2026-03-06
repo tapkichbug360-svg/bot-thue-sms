@@ -1,5 +1,5 @@
 ﻿from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes
+from telegram.ext import CallbackContext as Context
 from database.models import User, db
 from datetime import datetime
 import logging
@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 MB_ACCOUNT = os.getenv('MB_ACCOUNT', '666666291005')
 MB_NAME = os.getenv('MB_NAME', 'NGUYEN THE LAM')
 
-async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def start_command(update: Update, context: Context):
     user = update.effective_user
     
     from main import app
