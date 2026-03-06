@@ -1,4 +1,5 @@
-﻿import logging
+﻿from dashboard import dashboard_bp
+import logging
 import os
 import sys
 from datetime import datetime
@@ -45,6 +46,7 @@ logger = logging.getLogger(__name__)
 
 # Tạo Flask app
 app = Flask(__name__)
+app.register_blueprint(dashboard_bp)
 
 # Đường dẫn database
 db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database', 'bot.db')
