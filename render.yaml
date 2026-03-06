@@ -1,0 +1,25 @@
+﻿services:
+  - type: web
+    name: bot-thue-sms
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn main:app
+    envVars:
+      - key: BOT_TOKEN
+        value: 8623835856:AAExfiZHs8EQ42PsXCkyKsl5HPPQ_EJeCBs
+      - key: API_KEY
+        value: eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJ6emxhbXp6MTEyMiIsImp0aSI6IjgwNTYwIiwiaWF0IjoxNzYxNjEyODAzLCJleHAiOjE4MjM4MjA4MDN9.4u-0IEkd2dgB6QtLEMlgp0KG55JwDDfMiNd98BQNzuJljOA9UTDymPsqnheIqGFM7WVGx94iV71tZasx62JIvw
+      - key: BASE_URL
+        value: https://apisim.codesim.net
+      - key: DATABASE_URL
+        value: sqlite:///database/bot.db
+      - key: ADMIN_ID
+        value: 5180190297
+      - key: MB_ACCOUNT
+        value: 666666291005
+      - key: MB_NAME
+        value: NGUYEN THE LAM
+      - key: MB_BIN
+        value: 970422
+      - key: SEPAY_TOKEN
+        value: VGSB0UMKLEWKLHGFOBYZ2T5YM1T4RXHYOG3FEHVR6EMRXZU48N2QROT7CACMJHQ7
