@@ -2,20 +2,17 @@
 import os
 import sys
 import asyncio
-from dotenv import load_dotenv
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler
+from telegram import Update
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
 # Load biến môi trường
+from dotenv import load_dotenv
 load_dotenv()
 
 # Cấu hình logging
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO,
-    handlers=[
-        logging.FileHandler('bot.log', encoding='utf-8'),
-        logging.StreamHandler(sys.stdout)
-    ]
+    level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
@@ -41,7 +38,7 @@ async def main():
     try:
         logger.info("🚀 BOT TELEGRAM ĐANG KHỞI ĐỘNG...")
         
-        # Tạo application
+        # Tạo application với cấu hình đơn giản
         application = Application.builder().token(BOT_TOKEN).build()
         
         # Command handlers
@@ -56,14 +53,25 @@ async def main():
         
         logger.info("✅ BOT TELEGRAM ĐÃ KHỞI ĐỘNG THÀNH CÔNG!")
         
-        # Chạy bot
-        await application.run_polling(timeout=30, drop_pending_updates=True)
+        # Chạy bot với cách đơn giản hơn
+        await application.initialize()
+        await application.start()
         
+        # Chạy polling
+        await application.updater.start_polling(
+            timeout=30,
+            drop_pending_updates=True,
+            allowed_updates=["message", "callback_query"]
+        )
+        
+        # Giữ bot chạy
+        while True:
+            await asyncio.sleep(1)
+            
     except Exception as e:
         logger.error(f"❌ LỖI KHI CHẠY BOT: {e}")
         import traceback
         traceback.print_exc()
-        sys.exit(1)
 
 if __name__ == '__main__':
     try:
